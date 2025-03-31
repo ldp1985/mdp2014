@@ -7,11 +7,14 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="login-container">
+    <div class="login-container" id="login-container">
         <h2>Connexion</h2>
         <input type="text" id="login-username" placeholder="Nom d'utilisateur">
         <input type="password" id="login-password" placeholder="Mot de passe">
         <button id="login-button">Se connecter</button>
+    </div>
+    <div class="connected-user" id="connected-user" style="display: none;">
+        <p>Utilisateur connecté : <span id="connected-username"></span> <button id="logout-button">Déconnexion</button></p>
     </div>
     <div class="chat-container">
         <div class="chat-header">
