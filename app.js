@@ -39,30 +39,67 @@ async function getUsers() {
     }
 }
 
+// Fonction pour obtenir les coordonnées GPS de l'utilisateur
+function getGeolocation() {
+    return new Promise((resolve, reject) => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    });
+                },
+                error => {
+                    reject(error);
+                }
+            );
+        } else {
+            reject(new Error('Geolocation is not supported by this browser.'));
+        }
+    });
+}
+
+// Fonction pour obtenir la commune à partir des coordonnées GPS
+async function getCityFromCoordinates(latitude, longitude) {
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+    const data = await response.json();
+    return data.address.city || data.address.town || data.address.village || 'Unknown';
+}
+
 // Fonction pour envoyer un message via une requête POST
 async function sendMessage(userId, content) {
     console.log('Sending message:', { userId, content });
-    const response = await fetch(`${supabaseUrl}/rest/v1/messages`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-        },
-        body: JSON.stringify({
-            id_sent: userId,
-            user_id: userId,
-            content: content,
-            created_at: new Date().toISOString(), // Utiliser le format ISO 8601 correct
-            id_received: userSelect.value // Utilisez l'ID de l'utilisateur sélectionné comme destinataire
-        })
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        console.error('Error inserting message:', data);
-    } else {
-        console.log('Message inserted:', data);
-        getMessages(); // Rafraîchir les messages après l'insertion
+    try {
+        const geolocation = await getGeolocation();
+        const city = await getCityFromCoordinates(geolocation.latitude, geolocation.longitude);
+        const response = await fetch(`${supabaseUrl}/rest/v1/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseKey,
+                'Authorization': `Bearer ${supabaseKey}`
+            },
+            body: JSON.stringify({
+                id_sent: userId,
+                user_id: userId,
+                content: content,
+                created_at: new Date().toISOString(), // Utiliser le format ISO 8601 correct
+                id_received: userSelect.value, // Utilisez l'ID de l'utilisateur sélectionné comme destinataire
+                latitude: geolocation.latitude,
+                longitude: geolocation.longitude,
+                city: city
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            console.error('Error inserting message:', data);
+        } else {
+            console.log('Message inserted:', data);
+            getMessages(); // Rafraîchir les messages après l'insertion
+        }
+    } catch (error) {
+        console.error('Error getting geolocation or city:', error);
     }
 }
 
@@ -91,7 +128,8 @@ async function getMessages() {
         data.forEach(message => {
             const messageElement = document.createElement('div');
             const senderName = users[message.id_sent]?.username || 'Unknown'; // Récupérer le nom de l'utilisateur
-            messageElement.textContent = `${senderName}: ${message.content}`;
+            const city = message.city ? ` (${message.city})` : '';
+            messageElement.textContent = `${senderName}${city}: ${message.content}`;
             messageElement.classList.add('message');
             if (message.id_sent === currentUserId) {
                 messageElement.classList.add('sent');
@@ -105,7 +143,7 @@ async function getMessages() {
 
 // Fonction pour rafraîchir les messages automatiquement
 function refreshMessages() {
-    setInterval(getMessages, 500); // Rafraîchir les messages toutes les 5 secondes
+    setInterval(getMessages, 5000); // Rafraîchir les messages toutes les 5 secondes
 }
 
 // Fonction pour se connecter
