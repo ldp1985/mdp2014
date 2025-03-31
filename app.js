@@ -143,7 +143,7 @@ async function getMessages() {
 
 // Fonction pour rafraîchir les messages automatiquement
 function refreshMessages() {
-    setInterval(getMessages, 5000); // Rafraîchir les messages toutes les 5 secondes
+    setInterval(getMessages, 500); // Rafraîchir les messages toutes les 5 secondes
 }
 
 // Fonction pour se connecter
