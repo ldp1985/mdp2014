@@ -7,9 +7,14 @@ const userSelect = document.getElementById('user-select');
 const loginUsername = document.getElementById('login-username');
 const loginPassword = document.getElementById('login-password');
 const loginButton = document.getElementById('login-button');
+const loginContainer = document.getElementById('login-container');
+const connectedUser = document.getElementById('connected-user');
+const connectedUsername = document.getElementById('connected-username');
+const logoutButton = document.getElementById('logout-button');
 
 let users = {}; // Objet pour stocker les utilisateurs
 let currentUserId = null; // ID de l'utilisateur connecté
+let lastMessageTimestamp = null; // Dernier timestamp des messages récupérés
 
 // Fonction pour récupérer les utilisateurs
 async function getUsers() {
@@ -58,14 +63,18 @@ async function sendMessage(userId, content) {
         console.error('Error inserting message:', data);
     } else {
         console.log('Message inserted:', data);
-        window.location.reload(); // Rafraîchir la page après l'insertion
+        getMessages(); // Rafraîchir les messages après l'insertion
     }
 }
 
 // Fonction pour récupérer les messages via une requête GET
 async function getMessages() {
     console.log('Fetching messages...');
-    const response = await fetch(`${supabaseUrl}/rest/v1/messages?select=*&order=created_at.asc`, {
+    let query = `${supabaseUrl}/rest/v1/messages?select=*&order=created_at.asc`;
+    if (lastMessageTimestamp) {
+        query += `&created_at=gt.${lastMessageTimestamp}`;
+    }
+    const response = await fetch(query, {
         method: 'GET',
         headers: {
             'apikey': supabaseKey,
@@ -77,7 +86,9 @@ async function getMessages() {
         console.error('Error fetching messages:', data);
     } else {
         console.log('Messages fetched:', data);
-        chatMessages.innerHTML = '';
+        if (data.length > 0) {
+            lastMessageTimestamp = data[data.length - 1].created_at;
+        }
         data.forEach(message => {
             const messageElement = document.createElement('div');
             const senderName = users[message.id_sent]?.username || 'Unknown'; // Récupérer le nom de l'utilisateur
@@ -85,6 +96,11 @@ async function getMessages() {
             chatMessages.appendChild(messageElement);
         });
     }
+}
+
+// Fonction pour rafraîchir les messages automatiquement
+function refreshMessages() {
+    setInterval(getMessages, 5000); // Rafraîchir les messages toutes les 5 secondes
 }
 
 // Fonction pour se connecter
@@ -97,13 +113,26 @@ function login() {
         if (user.password === '' || user.password === password) {
             currentUserId = user.id;
             alert('Connexion réussie');
+            loginContainer.style.display = 'none'; // Masquer le bloc de connexion
+            connectedUser.style.display = 'block'; // Afficher le message de l'utilisateur connecté
+            connectedUsername.textContent = user.username; // Afficher le nom de l'utilisateur connecté
             getMessages();
+            refreshMessages(); // Démarrer le rafraîchissement automatique des messages
         } else {
             alert('Mot de passe incorrect');
         }
     } else {
         alert('Utilisateur non trouvé');
     }
+}
+
+// Fonction pour se déconnecter
+function logout() {
+    currentUserId = null;
+    loginContainer.style.display = 'block'; // Afficher le bloc de connexion
+    connectedUser.style.display = 'none'; // Masquer le message de l'utilisateur connecté
+    chatMessages.innerHTML = ''; // Vider les messages affichés
+    lastMessageTimestamp = null; // Réinitialiser le dernier timestamp des messages
 }
 
 // Envoyer un message lorsque le bouton est cliqué
@@ -123,8 +152,12 @@ sendButton.addEventListener('click', () => {
     }
 });
 
+
 // Se connecter lorsque le bouton est cliqué
 loginButton.addEventListener('click', login);
+
+// Se déconnecter lorsque le bouton est cliqué
+logoutButton.addEventListener('click', logout);
 
 // Charger les utilisateurs et les messages au chargement de la page
 window.onload = () => {
@@ -132,4 +165,3 @@ window.onload = () => {
         getMessages();
     });
 };
-
