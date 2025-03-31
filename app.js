@@ -1,5 +1,7 @@
 const supabaseUrl = 'https://mlzkkljtvhlshtoujubm.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1semtrbGp0dmhsc2h0b3VqdWJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzNDMyOTMsImV4cCI6MjA1ODkxOTI5M30._fYLWHH0EHtTyvqslouIcrOFz8l-ZBaqraKAON7Ce8k';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 const chatMessages = document.getElementById('chat-messages');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
@@ -17,16 +19,12 @@ let currentUserId = null; // ID de l'utilisateur connecté
 
 // Fonction pour récupérer les utilisateurs
 async function getUsers() {
-    const response = await fetch(`${supabaseUrl}/rest/v1/users?select=id,username,password`, {
-        method: 'GET',
-        headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-        }
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        console.error('Error fetching users:', data);
+    const { data, error } = await supabase
+        .from('users')
+        .select('id, username, password');
+
+    if (error) {
+        console.error('Error fetching users:', error);
     } else {
         userSelect.innerHTML = '';
         data.forEach(user => {
@@ -67,60 +65,51 @@ async function getCityFromCoordinates(latitude, longitude) {
     return data.address.city || data.address.town || data.address.village || 'Unknown';
 }
 
-// Fonction pour envoyer un message via une requête POST
+// Fonction pour envoyer un message via Supabase
 async function sendMessage(userId, content) {
     console.log('Sending message:', { userId, content });
     try {
         const geolocation = await getGeolocation();
         const city = await getCityFromCoordinates(geolocation.latitude, geolocation.longitude);
-        const response = await fetch(`${supabaseUrl}/rest/v1/messages`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': supabaseKey,
-                'Authorization': `Bearer ${supabaseKey}`
-            },
-            body: JSON.stringify({
-                id_sent: userId,
-                user_id: userId,
-                content: content,
-                created_at: new Date().toISOString(), // Utiliser le format ISO 8601 correct
-                id_received: userSelect.value, // Utilisez l'ID de l'utilisateur sélectionné comme destinataire
-                latitude: geolocation.latitude,
-                longitude: geolocation.longitude,
-                city: city
-            })
-        });
-        const data = await response.json();
-        if (!response.ok) {
-            console.error('Error inserting message:', data);
+        const { data, error } = await supabase
+            .from('messages')
+            .insert([
+                {
+                    id_sent: userId,
+                    id_received: userSelect.value,
+                    content: content,
+                    created_at: new Date().toISOString(),
+                    latitude: geolocation.latitude,
+                    longitude: geolocation.longitude,
+                    city: city
+                }
+            ]);
+
+        if (error) {
+            console.error('Error inserting message:', error);
         } else {
             console.log('Message inserted:', data);
-            getMessages(); // Rafraîchir les messages après l'insertion
         }
     } catch (error) {
         console.error('Error getting geolocation or city:', error);
     }
 }
 
-// Fonction pour supprimer un message via une requête DELETE
+// Fonction pour supprimer un message via Supabase
 async function deleteMessage(messageId) {
-    const response = await fetch(`${supabaseUrl}/rest/v1/messages?id=eq.${messageId}`, {
-        method: 'DELETE',
-        headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-        }
-    });
-    if (!response.ok) {
-        console.error('Error deleting message:', await response.json());
+    const { data, error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+
+    if (error) {
+        console.error('Error deleting message:', error);
     } else {
-        console.log('Message deleted:', messageId);
-        getMessages(); // Rafraîchir les messages après la suppression
+        console.log('Message deleted:', data);
     }
 }
 
-// Fonction pour récupérer les messages via une requête GET
+// Fonction pour récupérer les messages via Supabase
 async function getMessages() {
     if (!currentUserId || !userSelect.value) {
         chatMessages.innerHTML = ''; // Masquer les messages si aucun utilisateur n'est connecté ou sélectionné
@@ -128,17 +117,14 @@ async function getMessages() {
     }
 
     console.log('Fetching messages...');
-    const query = `${supabaseUrl}/rest/v1/messages?select=*&order=created_at.asc&or=(and(id_sent.eq.${currentUserId},id_received.eq.${userSelect.value}),and(id_sent.eq.${userSelect.value},id_received.eq.${currentUserId}))`;
-    const response = await fetch(query, {
-        method: 'GET',
-        headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`
-        }
-    });
-    const data = await response.json();
-    if (!response.ok) {
-        console.error('Error fetching messages:', data);
+    const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`id_sent.eq.${currentUserId},id_received.eq.${currentUserId}`)
+        .order('created_at', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching messages:', error);
     } else {
         console.log('Messages fetched:', data);
         chatMessages.innerHTML = ''; // Vider les messages affichés avant d'ajouter les nouveaux
@@ -175,11 +161,6 @@ async function getMessages() {
     }
 }
 
-// Fonction pour rafraîchir les messages automatiquement
-function refreshMessages() {
-    setInterval(getMessages, 50); // Rafraîchir les messages toutes les 0.5 secondes
-}
-
 // Fonction pour se connecter
 function login() {
     const username = loginUsername.value;
@@ -194,7 +175,6 @@ function login() {
             connectedUser.style.display = 'block'; // Afficher le message de l'utilisateur connecté
             connectedUsername.textContent = user.username; // Afficher le nom de l'utilisateur connecté
             getMessages();
-            refreshMessages(); // Démarrer le rafraîchissement automatique des messages
         } else {
             alert('Mot de passe incorrect');
         }
@@ -243,3 +223,32 @@ window.onload = () => {
 
 // Rafraîchir les messages lorsque l'utilisateur sélectionné change
 userSelect.addEventListener('change', getMessages);
+
+// Écouter les notifications de Supabase
+supabase
+    .from('messages')
+    .on('INSERT', payload => {
+        console.log('New message:', payload.new);
+        // Ajouter le nouveau message à l'interface utilisateur
+        const message = payload.new;
+        const messageDate = new Date(message.created_at).toLocaleDateString();
+        const messageTime = new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const senderName = users[message.id_sent]?.username || 'Unknown'; // Récupérer le nom de l'utilisateur
+        const city = message.city ? ` (${message.city} - ${messageTime})` : '';
+
+        const messageElement = document.createElement('div');
+        messageElement.textContent = `${senderName}${city}: ${message.content}`;
+        messageElement.classList.add('message');
+        if (message.id_sent === currentUserId) {
+            messageElement.classList.add('sent');
+            const deleteButton = document.createElement('span');
+            deleteButton.textContent = '✖';
+            deleteButton.classList.add('delete-button');
+            deleteButton.addEventListener('click', () => deleteMessage(message.id));
+            messageElement.appendChild(deleteButton);
+        } else {
+            messageElement.classList.add('received');
+        }
+        chatMessages.appendChild(messageElement);
+    })
+    .subscribe();
