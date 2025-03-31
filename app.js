@@ -54,7 +54,7 @@ async function sendMessage(userId, content) {
             id_sent: userId,
             user_id: userId,
             content: content,
-            created_at: new Date().toISOString(),
+            created_at: new Date().toISOString(), // Utiliser le format ISO 8601 correct
             id_received: userSelect.value // Utilisez l'ID de l'utilisateur sélectionné comme destinataire
         })
     });
@@ -71,9 +71,6 @@ async function sendMessage(userId, content) {
 async function getMessages() {
     console.log('Fetching messages...');
     let query = `${supabaseUrl}/rest/v1/messages?select=*&order=created_at.asc`;
-    if (lastMessageTimestamp) {
-        query += `&created_at=gt.${lastMessageTimestamp}`;
-    }
     const response = await fetch(query, {
         method: 'GET',
         headers: {
@@ -86,13 +83,17 @@ async function getMessages() {
         console.error('Error fetching messages:', data);
     } else {
         console.log('Messages fetched:', data);
-        if (data.length > 0) {
-            lastMessageTimestamp = data[data.length - 1].created_at;
-        }
+        chatMessages.innerHTML = ''; // Vider les messages affichés avant d'ajouter les nouveaux
         data.forEach(message => {
             const messageElement = document.createElement('div');
             const senderName = users[message.id_sent]?.username || 'Unknown'; // Récupérer le nom de l'utilisateur
             messageElement.textContent = `${senderName}: ${message.content}`;
+            messageElement.classList.add('message');
+            if (message.id_sent === currentUserId) {
+                messageElement.classList.add('sent');
+            } else {
+                messageElement.classList.add('received');
+            }
             chatMessages.appendChild(messageElement);
         });
     }
@@ -151,7 +152,6 @@ sendButton.addEventListener('click', () => {
         alert('Veuillez vous connecter pour envoyer un message');
     }
 });
-
 
 // Se connecter lorsque le bouton est cliqué
 loginButton.addEventListener('click', login);
