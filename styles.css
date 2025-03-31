@@ -99,6 +99,26 @@ body {
     border-bottom: 1px solid #ddd;
 }
 
+.chat-messages .message {
+    margin: 5px 0;
+    padding: 10px;
+    border-radius: 5px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.chat-messages .message.sent {
+    background-color: #dcf8c6;
+    align-self: flex-end;
+    text-align: right;
+}
+
+.chat-messages .message.received {
+    background-color: #fff;
+    align-self: flex-start;
+    text-align: left;
+}
+
 .chat-input {
     display: flex;
     padding: 10px;
