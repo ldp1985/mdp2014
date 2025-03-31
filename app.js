@@ -14,7 +14,6 @@ const logoutButton = document.getElementById('logout-button');
 
 let users = {}; // Objet pour stocker les utilisateurs
 let currentUserId = null; // ID de l'utilisateur connecté
-let lastMessageTimestamp = null; // Dernier timestamp des messages récupérés
 
 // Fonction pour récupérer les utilisateurs
 async function getUsers() {
@@ -69,8 +68,13 @@ async function sendMessage(userId, content) {
 
 // Fonction pour récupérer les messages via une requête GET
 async function getMessages() {
+    if (!currentUserId || !userSelect.value) {
+        chatMessages.innerHTML = ''; // Masquer les messages si aucun utilisateur n'est connecté ou sélectionné
+        return;
+    }
+
     console.log('Fetching messages...');
-    let query = `${supabaseUrl}/rest/v1/messages?select=*&order=created_at.asc`;
+    const query = `${supabaseUrl}/rest/v1/messages?select=*&order=created_at.asc&or=(and(id_sent.eq.${currentUserId},id_received.eq.${userSelect.value}),and(id_sent.eq.${userSelect.value},id_received.eq.${currentUserId}))`;
     const response = await fetch(query, {
         method: 'GET',
         headers: {
@@ -101,7 +105,7 @@ async function getMessages() {
 
 // Fonction pour rafraîchir les messages automatiquement
 function refreshMessages() {
-    setInterval(getMessages, 5000); // Rafraîchir les messages toutes les 5 secondes
+    setInterval(getMessages, 500); // Rafraîchir les messages toutes les 5 secondes
 }
 
 // Fonction pour se connecter
@@ -133,7 +137,6 @@ function logout() {
     loginContainer.style.display = 'block'; // Afficher le bloc de connexion
     connectedUser.style.display = 'none'; // Masquer le message de l'utilisateur connecté
     chatMessages.innerHTML = ''; // Vider les messages affichés
-    lastMessageTimestamp = null; // Réinitialiser le dernier timestamp des messages
 }
 
 // Envoyer un message lorsque le bouton est cliqué
@@ -165,3 +168,6 @@ window.onload = () => {
         getMessages();
     });
 };
+
+// Rafraîchir les messages lorsque l'utilisateur sélectionné change
+userSelect.addEventListener('change', getMessages);
