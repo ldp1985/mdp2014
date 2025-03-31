@@ -105,6 +105,7 @@ body {
     border-radius: 5px;
     max-width: 70%;
     word-wrap: break-word;
+    position: relative;
 }
 
 .chat-messages .message.sent {
@@ -117,6 +118,21 @@ body {
     background-color: #fff;
     align-self: flex-start;
     text-align: left;
+}
+
+.chat-messages .date {
+    text-align: center;
+    margin: 10px 0;
+    font-weight: bold;
+}
+
+.chat-messages .delete-button {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    cursor: pointer;
+    color: red;
+    font-weight: bold;
 }
 
 .chat-input {
