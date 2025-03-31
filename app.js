@@ -103,6 +103,23 @@ async function sendMessage(userId, content) {
     }
 }
 
+// Fonction pour supprimer un message via une requête DELETE
+async function deleteMessage(messageId) {
+    const response = await fetch(`${supabaseUrl}/rest/v1/messages?id=eq.${messageId}`, {
+        method: 'DELETE',
+        headers: {
+            'apikey': supabaseKey,
+            'Authorization': `Bearer ${supabaseKey}`
+        }
+    });
+    if (!response.ok) {
+        console.error('Error deleting message:', await response.json());
+    } else {
+        console.log('Message deleted:', messageId);
+        getMessages(); // Rafraîchir les messages après la suppression
+    }
+}
+
 // Fonction pour récupérer les messages via une requête GET
 async function getMessages() {
     if (!currentUserId || !userSelect.value) {
@@ -125,14 +142,31 @@ async function getMessages() {
     } else {
         console.log('Messages fetched:', data);
         chatMessages.innerHTML = ''; // Vider les messages affichés avant d'ajouter les nouveaux
+        let lastDate = null;
         data.forEach(message => {
-            const messageElement = document.createElement('div');
+            const messageDate = new Date(message.created_at).toLocaleDateString();
+            const messageTime = new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             const senderName = users[message.id_sent]?.username || 'Unknown'; // Récupérer le nom de l'utilisateur
-            const city = message.city ? ` (${message.city})` : '';
+            const city = message.city ? ` (${message.city} - ${messageTime})` : '';
+
+            if (messageDate !== lastDate) {
+                const dateElement = document.createElement('div');
+                dateElement.textContent = messageDate;
+                dateElement.classList.add('date');
+                chatMessages.appendChild(dateElement);
+                lastDate = messageDate;
+            }
+
+            const messageElement = document.createElement('div');
             messageElement.textContent = `${senderName}${city}: ${message.content}`;
             messageElement.classList.add('message');
             if (message.id_sent === currentUserId) {
                 messageElement.classList.add('sent');
+                const deleteButton = document.createElement('span');
+                deleteButton.textContent = '✖';
+                deleteButton.classList.add('delete-button');
+                deleteButton.addEventListener('click', () => deleteMessage(message.id));
+                messageElement.appendChild(deleteButton);
             } else {
                 messageElement.classList.add('received');
             }
@@ -143,7 +177,7 @@ async function getMessages() {
 
 // Fonction pour rafraîchir les messages automatiquement
 function refreshMessages() {
-    setInterval(getMessages, 500); // Rafraîchir les messages toutes les 5 secondes
+    setInterval(getMessages, 500); // Rafraîchir les messages toutes les 0.5 secondes
 }
 
 // Fonction pour se connecter
